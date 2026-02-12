@@ -45,9 +45,14 @@ class DetectionPuzzle:
     - Detected objects (bounding boxes, classes)
     - An action description (e.g., "person holding cup")
     - A label indicating if the description is correct
+    
+    Note: image_path is stored for reference but NOT used for feature extraction
+    in the current implementation. Only detection metadata (boxes, classes) is
+    encoded as discrete tokens. To use actual image features, extend with a
+    vision encoder (see DETECTION_README.md).
     """
     id: str
-    image_path: str
+    image_path: str  # Stored but not used - only detection metadata is encoded
     boxes: np.ndarray  # (N, 4) - [x1, y1, x2, y2] normalized to [0, 1]
     classes: np.ndarray  # (N,) - class IDs
     action_description: str

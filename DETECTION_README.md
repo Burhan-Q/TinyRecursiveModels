@@ -2,21 +2,32 @@
 
 This extension adapts TinyRecursiveModels (TRM) to work with image object detection data, specifically for verifying whether action descriptions match the detected objects in images.
 
+## Important Note
+
+**This implementation uses detection metadata (bounding boxes + class IDs), not raw image pixels:**
+- The current approach encodes object detections as discrete tokens
+- Image paths are stored in the dataset but **not used for feature extraction**
+- No image embeddings or vision encoder are included in this version
+- This design maintains compatibility with TRM's token-based architecture
+- To use actual image features, see [Extending to Real-World Use Cases](#extending-to-real-world-use-cases)
+
 ## Overview
 
 The object detection adaptation allows TRM to:
-- Process images with object detection predictions (bounding boxes and class labels)
-- Verify if action descriptions correctly describe what's happening in the image
+- Process object detection predictions (bounding boxes and class labels)
+- Verify if action descriptions correctly describe what's detected in the scene
 - Use recursive reasoning to improve classification accuracy
 
 ## Task Description
 
 Given:
-- An image with detected objects (bounding boxes + class labels)
+- Object detection results: bounding boxes + class labels (e.g., person at [0.1, 0.2, 0.5, 0.6], cup at [0.3, 0.4, 0.4, 0.5])
 - A text description of an action (e.g., "person holding cup")
 
 The model predicts:
-- Whether the description correctly describes the scene (binary classification: correct/incorrect)
+- Whether the description correctly describes the detected objects (binary classification: correct/incorrect)
+
+**Note**: The model does not process the raw image - only the detection metadata.
 
 ## Dataset Format
 
@@ -150,10 +161,61 @@ The model uses the same TRM architecture as the original paper, but:
 
 ## Extending to Real-World Use Cases
 
-To adapt this for production object detection:
+The current implementation uses **detection metadata only** (no image pixels). To adapt this for production object detection with actual images:
 
-1. **Add Vision Encoder**: Replace token embeddings with CNN/Vision Transformer features
-2. **Use Real Detections**: Integrate with YOLO, Faster R-CNN, or other detectors
+1. **Add Vision Encoder**: 
+   - Integrate a CNN (ResNet, EfficientNet) or Vision Transformer (ViT, CLIP)
+   - Extract image features (e.g., 2048-dim vector from ResNet)
+   - Replace or augment the `IMAGE_START` token with image embedding
+   - Update model to accept both discrete tokens and continuous features
+
+2. **Use Real Detections**: 
+   - Integrate with YOLO, Faster R-CNN, DETR, or other detectors
+   - Run detector on raw images to get bboxes + classes
+   - Feed detection results into TRM as discrete tokens (current approach)
+
+3. **Action Dataset**: 
+   - Use datasets with human-annotated action descriptions:
+     - HICO-DET (Human-Object Interaction Detection)
+     - V-COCO (Verbs in COCO)
+     - Custom annotations linking detections to actions
+   - Replace synthetic descriptions with real annotations
+
+4. **Multi-label Classification**: 
+   - Extend beyond binary to predict multiple simultaneous actions
+   - Support complex descriptions: "person holding cup and sitting on chair"
+
+5. **Temporal Reasoning**: 
+   - Process video sequences frame-by-frame
+   - Track objects and actions over time
+   - Add temporal tokens to encode frame ordering
+
+### Example Integration with Vision Encoder
+
+```python
+# Pseudocode for adding image features
+class DetectionModelWithVision(nn.Module):
+    def __init__(self):
+        self.vision_encoder = torchvision.models.resnet50(pretrained=True)
+        self.token_embeddings = nn.Embedding(vocab_size, hidden_dim)
+        self.fusion = nn.Linear(2048 + hidden_dim, hidden_dim)
+        self.trm = TinyRecursiveModel(...)
+    
+    def forward(self, image, detection_tokens):
+        # Extract image features
+        img_features = self.vision_encoder(image)  # (B, 2048)
+        
+        # Embed detection tokens
+        token_embeds = self.token_embeddings(detection_tokens)  # (B, seq_len, hidden_dim)
+        
+        # Fuse image features with first token
+        token_embeds[:, 0] = self.fusion(
+            torch.cat([img_features, token_embeds[:, 0]], dim=-1)
+        )
+        
+        # Run TRM
+        return self.trm(token_embeds)
+```
 3. **Action Dataset**: Use datasets like HICO-DET, V-COCO, or create custom annotations
 4. **Multi-label Classification**: Extend to predict multiple action types
 5. **Temporal Reasoning**: Add video support for action recognition over time

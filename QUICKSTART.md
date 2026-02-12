@@ -7,9 +7,11 @@ This guide gets you started with the object detection adaptation in **under 5 mi
 Adapts TinyRecursiveModels (TRM) to verify if action descriptions match object detections in images.
 
 **Example Task:**
-- Input: Image with detected objects (person, cup, chair)
+- Input: Detected objects metadata (person at bbox [0.1,0.2,0.5,0.6], cup at [0.3,0.4,0.4,0.5])
 - Description: "person holding cup"
 - Output: Correct ✓ or Incorrect ✗
+
+**⚠️ Important**: This implementation uses **detection metadata only** (bounding boxes + class IDs), not raw image pixels. To use actual image features, see "Use Your Own Dataset" section and DETECTION_README.md.
 
 ## Already Set Up ✅
 
