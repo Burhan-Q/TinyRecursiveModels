@@ -113,7 +113,9 @@ def load_coco_annotations(annotation_file: str, images_dir: str, config: Detecti
                 action_description = "no objects"
             
             # Randomly mark some as correct/incorrect for training
-            is_correct = np.random.random() > 0.3  # 70% correct
+            # 70% correct, 30% incorrect for balanced training data
+            INCORRECT_LABEL_PROBABILITY = 0.3
+            is_correct = np.random.random() > INCORRECT_LABEL_PROBABILITY
         else:
             action_description = ""
             is_correct = True
@@ -161,17 +163,26 @@ def encode_detection_to_sequence(
         input_seq: (seq_len,) array of token IDs
         label_seq: (seq_len,) array of label token IDs
     """
-    # Vocabulary:
-    # 0: PAD
-    # 1: EOS (end of sequence)
-    # 2: IMAGE_START
-    # 3-6: Coordinate tokens (x1, y1, x2, y2 quantized to bins)
-    # 7+: Class tokens and description tokens
+    # Token vocabulary constants
+    TOKEN_PAD = 0
+    TOKEN_EOS = 1
+    TOKEN_IMAGE_START = 2
+    CLASS_TOKEN_OFFSET = 10  # Classes start at token 10 to avoid collision with special tokens
+    
+    # Coordinate quantization
+    COORD_BINS = 256  # Number of bins for coordinate quantization
+    # Coordinate offset must be > num_classes + offset to avoid collision
+    COORD_TOKEN_OFFSET = 1000  # Ensures separation from class tokens (max ~90)
+    
+    # Validate no token collision
+    max_class_token = config.num_classes + CLASS_TOKEN_OFFSET
+    assert COORD_TOKEN_OFFSET > max_class_token, \
+        f"Coordinate offset {COORD_TOKEN_OFFSET} must be > max class token {max_class_token}"
     
     # For simplicity, we'll create a sequence representation:
     # [IMAGE_START, obj1_class, obj1_x1, obj1_y1, obj1_x2, obj1_y2, obj2_class, ..., EOS]
     
-    seq_parts = [2]  # IMAGE_START token
+    seq_parts = [TOKEN_IMAGE_START]
     
     # Add object detections
     for i in range(min(len(puzzle.boxes), config.max_objects)):
@@ -179,19 +190,16 @@ def encode_detection_to_sequence(
         cls = puzzle.classes[i]
         
         # Quantize coordinates to discrete bins (0-255 mapped to token space)
-        coord_bins = 256
-        coord_offset = 1000  # Large offset to separate from class tokens
-        
-        x1 = int(box[0] * coord_bins) + coord_offset
-        y1 = int(box[1] * coord_bins) + coord_offset
-        x2 = int(box[2] * coord_bins) + coord_offset
-        y2 = int(box[3] * coord_bins) + coord_offset
+        x1 = int(box[0] * COORD_BINS) + COORD_TOKEN_OFFSET
+        y1 = int(box[1] * COORD_BINS) + COORD_TOKEN_OFFSET
+        x2 = int(box[2] * COORD_BINS) + COORD_TOKEN_OFFSET
+        y2 = int(box[3] * COORD_BINS) + COORD_TOKEN_OFFSET
         
         # Add: class, x1, y1, x2, y2
-        seq_parts.extend([int(cls) + 10, x1, y1, x2, y2])  # +10 offset for class tokens
+        seq_parts.extend([int(cls) + CLASS_TOKEN_OFFSET, x1, y1, x2, y2])
     
     # Add EOS
-    seq_parts.append(1)
+    seq_parts.append(TOKEN_EOS)
     
     # Pad to fixed length
     max_seq_len = (config.max_objects * 5) + 10  # 5 tokens per object + some buffer
@@ -254,8 +262,14 @@ def save_split_data(
     np.save(os.path.join(output_dir, split, f"{set_name}__group_indices.npy"), group_indices)
     
     # Create metadata
+    # Token vocabulary constants (must match encode_detection_to_sequence)
+    SPECIAL_TOKEN_COUNT = 10  # PAD, EOS, IMAGE_START, and reserved
+    CLASS_TOKEN_OFFSET = 10
+    COORD_BINS = 256
+    COORD_TOKEN_OFFSET = 1000
+    
     max_seq_len = (config.max_objects * 5) + 10
-    vocab_size = 1000 + 256 + config.num_classes + 10  # Coordinate bins + classes + special tokens
+    vocab_size = COORD_TOKEN_OFFSET + COORD_BINS + config.num_classes + CLASS_TOKEN_OFFSET
     
     metadata = PuzzleDatasetMetadata(
         pad_id=0,

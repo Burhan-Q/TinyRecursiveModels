@@ -18,6 +18,9 @@ class DetectionActionEvaluator:
     - F1 Score: Harmonic mean of precision and recall
     """
     
+    # Small constant to avoid division by zero
+    EPSILON = 1e-8
+    
     def __init__(
         self,
         data_path: str,
@@ -115,9 +118,9 @@ class DetectionActionEvaluator:
         false_positives = ((preds == 1) & (labels == 0)).sum()
         false_negatives = ((preds == 0) & (labels == 1)).sum()
         
-        precision = true_positives / (true_positives + false_positives + 1e-8)
-        recall = true_positives / (true_positives + false_negatives + 1e-8)
-        f1 = 2 * precision * recall / (precision + recall + 1e-8)
+        precision = true_positives / (true_positives + false_positives + self.EPSILON)
+        recall = true_positives / (true_positives + false_negatives + self.EPSILON)
+        f1 = 2 * precision * recall / (precision + recall + self.EPSILON)
         
         metrics = {
             "detection/accuracy": float(accuracy),

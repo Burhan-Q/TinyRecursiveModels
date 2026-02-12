@@ -38,14 +38,22 @@ subprocess.run([
 print("\nOrganizing dataset...")
 os.makedirs("data/coco8-detection", exist_ok=True)
 
-# Move train split
+# Move train split (remove destination if it exists to avoid rename errors)
+train_dest = "data/coco8-detection/train"
+if os.path.exists(train_dest):
+    import shutil
+    shutil.rmtree(train_dest)
 if os.path.exists("data/coco8-detection-temp-train/train"):
-    os.rename("data/coco8-detection-temp-train/train", "data/coco8-detection/train")
+    os.rename("data/coco8-detection-temp-train/train", train_dest)
     os.rmdir("data/coco8-detection-temp-train")
 
-# Move test split
+# Move test split (remove destination if it exists to avoid rename errors)
+test_dest = "data/coco8-detection/test"
+if os.path.exists(test_dest):
+    import shutil
+    shutil.rmtree(test_dest)
 if os.path.exists("data/coco8-detection-temp-test/test"):
-    os.rename("data/coco8-detection-temp-test/test", "data/coco8-detection/test")
+    os.rename("data/coco8-detection-temp-test/test", test_dest)
     os.rmdir("data/coco8-detection-temp-test")
 
 print("\nDataset ready at data/coco8-detection/")

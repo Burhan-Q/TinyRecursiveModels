@@ -122,7 +122,7 @@ def main():
     print()
     print("python -m dataset.build_detection_dataset \\")
     print(f"  --input-annotation-file {train_ann_file} \\")
-    print(f"  --input-images-dir {output_dir}/images \\")  # Note: would need actual images
+    print(f"  --input-images-dir {output_dir}/images \\")
     print(f"  --output-dir {output_dir}-processed \\")
     print("  --annotation-format coco \\")
     print("  --subsets train \\")
@@ -131,8 +131,9 @@ def main():
     print("  --max-objects 20 \\")
     print("  --num-classes 8")
     print()
-    print("Note: This example creates annotations only. For real usage,")
-    print("      you need actual images in the input-images-dir.")
+    print("⚠️  WARNING: This example creates annotations only.")
+    print("    You must provide actual images in the input-images-dir.")
+    print("    For a working example, see the COCO8 dataset setup in README.md")
     print()
     
     # Step 3: Explain training
